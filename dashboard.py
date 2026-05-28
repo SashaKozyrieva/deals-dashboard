@@ -286,14 +286,14 @@ if issues:
     summary = issues_df["❗ Проблема"].value_counts().reset_index()
     summary.columns = ["Тип проблеми", "Кількість"]
 
-    col_a, col_b = st.columns([1, 2])
+    total_issues = len(issues_df)
+    st.metric("Всього проблем", total_issues,
+              delta=f"{round(total_issues/len(df)*100,1)}% від усіх угод",
+              delta_color="inverse")
+
+    col_a, col_b = st.columns(2)
     with col_a:
-        st.subheader("📊 Зведення")
-        total_issues = len(issues_df)
-        st.metric("Всього проблем", total_issues,
-                  delta=f"{round(total_issues/len(df)*100,1)}% від усіх угод",
-                  delta_color="inverse")
-        st.dataframe(summary, use_container_width=True, hide_index=True)
+        st.dataframe(summary, use_container_width=True, hide_index=True, height=210)
 
     with col_b:
         fig_q = px.bar(
@@ -302,7 +302,7 @@ if issues:
         )
         fig_q.update_traces(textposition="outside")
         fig_q.update_layout(showlegend=False, coloraxis_showscale=False,
-                            margin=dict(l=0, r=20, t=10, b=0), height=280)
+                            margin=dict(l=0, r=40, t=10, b=0), height=210)
         st.plotly_chart(fig_q, use_container_width=True)
 
     # Фільтр по типу проблеми
