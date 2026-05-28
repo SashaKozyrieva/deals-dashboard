@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from pathlib import Path
 
 st.set_page_config(page_title="Deals Analytics", layout="wide", page_icon="📊")
 
@@ -12,9 +13,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+DATA_PATH = Path(__file__).parent / "data.xlsx"
+
 @st.cache_data
 def load_data():
-    df = pd.read_excel("data.xlsx")
+    df = pd.read_excel(DATA_PATH)
     df["AQL date"] = pd.to_datetime(df["AQL date"], errors="coerce")
     df["Closing Date"] = pd.to_datetime(df["Closing Date"], errors="coerce")
 
