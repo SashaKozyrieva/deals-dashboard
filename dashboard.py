@@ -99,13 +99,14 @@ with col1:
         .reset_index()
     )
     by_country.columns = ["Country", "Win Rate %"]
-    by_country = by_country.sort_values("Win Rate %", ascending=True)
+    by_country = by_country[by_country["Win Rate %"] > 0].sort_values("Win Rate %", ascending=True)
+    country_h = max(300, len(by_country) * 28)
     fig = px.bar(by_country, x="Win Rate %", y="Country", orientation="h",
                  color="Win Rate %", color_continuous_scale="teal",
                  text=by_country["Win Rate %"].apply(lambda x: f"{x:.0f}%"))
     fig.update_traces(textposition="outside")
     fig.update_layout(showlegend=False, coloraxis_showscale=False,
-                      margin=dict(l=0, r=20, t=10, b=0), height=380)
+                      margin=dict(l=0, r=40, t=10, b=0), height=country_h)
     st.plotly_chart(fig, use_container_width=True)
 
 with col2:
@@ -117,12 +118,13 @@ with col2:
     )
     by_crm.columns = ["CRM", "Win Rate %"]
     by_crm = by_crm[by_crm["Win Rate %"] > 0].sort_values("Win Rate %", ascending=True)
+    crm_h = max(300, len(by_crm) * 28)
     fig2 = px.bar(by_crm, x="Win Rate %", y="CRM", orientation="h",
                   color="Win Rate %", color_continuous_scale="purples",
                   text=by_crm["Win Rate %"].apply(lambda x: f"{x:.0f}%"))
     fig2.update_traces(textposition="outside")
     fig2.update_layout(showlegend=False, coloraxis_showscale=False,
-                       margin=dict(l=0, r=20, t=10, b=0), height=380)
+                       margin=dict(l=0, r=40, t=10, b=0), height=crm_h)
     st.plotly_chart(fig2, use_container_width=True)
 
 # ── Row 2: Stage distribution + Deals by Source ──────────────────────────────
