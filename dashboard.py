@@ -295,7 +295,7 @@ if issues:
     col_a, col_b = st.columns([1, 2])
     with col_a:
         row_h = 35
-        table_h = len(summary) * row_h + 38
+        table_h = len(summary) * row_h + 58
         st.dataframe(summary, use_container_width=True, hide_index=True, height=table_h)
 
     with col_b:
