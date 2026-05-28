@@ -292,9 +292,11 @@ if issues:
               delta=f"{round(total_issues/len(df)*100,1)}% від усіх угод",
               delta_color="inverse")
 
-    col_a, col_b = st.columns(2)
+    col_a, col_b = st.columns([1, 2])
     with col_a:
-        st.dataframe(summary, use_container_width=True, hide_index=True, height=210)
+        row_h = 35
+        table_h = len(summary) * row_h + 38
+        st.dataframe(summary, use_container_width=True, hide_index=True, height=table_h)
 
     with col_b:
         fig_q = px.bar(
@@ -304,7 +306,7 @@ if issues:
         fig_q.update_traces(textposition="outside")
         fig_q.update_layout(
             showlegend=False, coloraxis_showscale=False,
-            margin=dict(l=0, r=40, t=10, b=0), height=210,
+            margin=dict(l=0, r=40, t=0, b=0), height=table_h,
             yaxis=dict(categoryorder="array",
                        categoryarray=summary["Тип проблеми"].tolist()[::-1])
         )
