@@ -282,9 +282,10 @@ for _, row in df[mask5].iterrows():
 if issues:
     issues_df = pd.DataFrame(issues)
 
-    # Зведена статистика
+    # Зведена статистика — сортування за кількістю (від більшого до меншого)
     summary = issues_df["❗ Проблема"].value_counts().reset_index()
     summary.columns = ["Тип проблеми", "Кількість"]
+    summary = summary.sort_values("Кількість", ascending=False).reset_index(drop=True)
 
     total_issues = len(issues_df)
     st.metric("Всього проблем", total_issues,
@@ -301,8 +302,12 @@ if issues:
             color="Кількість", color_continuous_scale="reds", text="Кількість"
         )
         fig_q.update_traces(textposition="outside")
-        fig_q.update_layout(showlegend=False, coloraxis_showscale=False,
-                            margin=dict(l=0, r=40, t=10, b=0), height=210)
+        fig_q.update_layout(
+            showlegend=False, coloraxis_showscale=False,
+            margin=dict(l=0, r=40, t=10, b=0), height=210,
+            yaxis=dict(categoryorder="array",
+                       categoryarray=summary["Тип проблеми"].tolist()[::-1])
+        )
         st.plotly_chart(fig_q, use_container_width=True)
 
     # Фільтр по типу проблеми
