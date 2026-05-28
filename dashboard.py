@@ -203,3 +203,128 @@ st.plotly_chart(fig5, use_container_width=True)
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.caption(f"Дані: {total} угод | {len(sel_countries)} країн | {len(sel_crms)} CRM")
+
+# ── TAB: Data Quality ─────────────────────────────────────────────────────────
+st.divider()
+st.header("🔍 Data Quality Check")
+
+issues = []
+
+# 1. Closed Won/Lost без Closing Date
+mask1 = df["Stage"].isin(["Closed Won", "Closed Lost"]) & df["Closing Date"].isna()
+for _, row in df[mask1].iterrows():
+    issues.append({
+        "❗ Проблема": "Closed Won/Lost без Closing Date",
+        "AQL date": str(row["AQL date"])[:10],
+        "Stage": row["Stage"],
+        "Country": row["Client country"],
+        "CRM": row["Client CRM"],
+        "Source": row["Source"],
+        "Деталі": "Stage закрита, але дата закриття відсутня"
+    })
+
+# 2. Не закрита угода, але є Closing Date
+mask2 = ~df["Stage"].isin(["Closed Won", "Closed Lost"]) & df["Closing Date"].notna()
+for _, row in df[mask2].iterrows():
+    issues.append({
+        "❗ Проблема": "Closing Date у незакритій угоді",
+        "AQL date": str(row["AQL date"])[:10],
+        "Stage": row["Stage"],
+        "Country": row["Client country"],
+        "CRM": row["Client CRM"],
+        "Source": row["Source"],
+        "Деталі": f"Stage = {row['Stage']}, але є Closing Date"
+    })
+
+# 3. Closing Date раніше за AQL date
+mask3 = df["AQL date"].notna() & df["Closing Date"].notna() & (df["Closing Date"] < df["AQL date"])
+for _, row in df[mask3].iterrows():
+    issues.append({
+        "❗ Проблема": "Closing Date раніше за AQL date",
+        "AQL date": str(row["AQL date"])[:10],
+        "Stage": row["Stage"],
+        "Country": row["Client country"],
+        "CRM": row["Client CRM"],
+        "Source": row["Source"],
+        "Деталі": f"AQL: {str(row['AQL date'])[:10]} → Closing: {str(row['Closing Date'])[:10]}"
+    })
+
+# 4. Closed Lost без причини відмови
+mask4 = (df["Stage"] == "Closed Lost") & (
+    df["Loss reason description"].isna() |
+    (df["Loss reason description"].astype(str).str.strip() == "")
+)
+for _, row in df[mask4].iterrows():
+    issues.append({
+        "❗ Проблема": "Closed Lost без причини відмови",
+        "AQL date": str(row["AQL date"])[:10],
+        "Stage": row["Stage"],
+        "Country": row["Client country"],
+        "CRM": row["Client CRM"],
+        "Source": row["Source"],
+        "Деталі": "Loss reason description порожня"
+    })
+
+# 5. Нульова кількість sales reps
+mask5 = df["Number of sales reps"].isna() | (df["Number of sales reps"] == 0)
+for _, row in df[mask5].iterrows():
+    issues.append({
+        "❗ Проблема": "Відсутня кількість sales reps",
+        "AQL date": str(row["AQL date"])[:10],
+        "Stage": row["Stage"],
+        "Country": row["Client country"],
+        "CRM": row["Client CRM"],
+        "Source": row["Source"],
+        "Деталі": f"Number of sales reps = {row['Number of sales reps']}"
+    })
+
+# ── Виводимо результат ────────────────────────────────────────────────────────
+if issues:
+    issues_df = pd.DataFrame(issues)
+
+    # Зведена статистика
+    summary = issues_df["❗ Проблема"].value_counts().reset_index()
+    summary.columns = ["Тип проблеми", "Кількість"]
+
+    col_a, col_b = st.columns([1, 2])
+    with col_a:
+        st.subheader("📊 Зведення")
+        total_issues = len(issues_df)
+        st.metric("Всього проблем", total_issues,
+                  delta=f"{round(total_issues/len(df)*100,1)}% від усіх угод",
+                  delta_color="inverse")
+        st.dataframe(summary, use_container_width=True, hide_index=True)
+
+    with col_b:
+        fig_q = px.bar(
+            summary, x="Кількість", y="Тип проблеми", orientation="h",
+            color="Кількість", color_continuous_scale="reds", text="Кількість"
+        )
+        fig_q.update_traces(textposition="outside")
+        fig_q.update_layout(showlegend=False, coloraxis_showscale=False,
+                            margin=dict(l=0, r=20, t=10, b=0), height=280)
+        st.plotly_chart(fig_q, use_container_width=True)
+
+    # Фільтр по типу проблеми
+    st.subheader("📋 Таблиця Data Issues")
+    issue_types = ["Всі"] + sorted(issues_df["❗ Проблема"].unique().tolist())
+    selected_type = st.selectbox("Фільтр по типу проблеми", issue_types)
+
+    show_df = issues_df if selected_type == "Всі" else issues_df[issues_df["❗ Проблема"] == selected_type]
+
+    st.dataframe(
+        show_df.reset_index(drop=True),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "❗ Проблема": st.column_config.TextColumn(width="medium"),
+            "Деталі": st.column_config.TextColumn(width="large"),
+        }
+    )
+
+    # Кнопка завантажити як CSV
+    csv = show_df.to_csv(index=False).encode("utf-8")
+    st.download_button("⬇️ Завантажити як CSV", csv, "data_issues.csv", "text/csv")
+
+else:
+    st.success("✅ Проблем з даними не знайдено!")
