@@ -3,21 +3,49 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from pathlib import Path
+import io, urllib.request
 
 st.set_page_config(page_title="Deals Analytics", layout="wide", page_icon="📊")
 
 st.markdown("""
 <style>
     .block-container { padding-top: 1.5rem; }
-    .metric-card { background: #f8f9fa; border-radius: 10px; padding: 1rem; }
 </style>
 """, unsafe_allow_html=True)
 
-DATA_PATH = Path(__file__).parent / "data.xlsx"
+SHEET_ID = "1JtASSHTRmIyGGU7tWTUGVUmBZwvmtxc6kAKLbHN9gS8"
 
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_data():
-    df = pd.read_excel(DATA_PATH)
+    # Спробуємо завантажити з Google Sheets
+    urls_to_try = [
+        f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0",
+        f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv",
+    ]
+    df = None
+    for url in urls_to_try:
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Mozilla/5.0"}
+            )
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = r.read()
+            df = pd.read_csv(io.BytesIO(data))
+            break
+        except Exception:
+            continue
+
+    # Fallback: локальний файл data.xlsx
+    if df is None:
+        local = Path(__file__).parent / "data.xlsx"
+        if local.exists():
+            df = pd.read_excel(local)
+        else:
+            st.error("❌ Не вдалося завантажити дані. Переконайся що таблиця відкрита для перегляду або додай data.xlsx у репо.")
+            st.stop()
+
+    df.columns = df.columns.str.strip()
     df["AQL date"] = pd.to_datetime(df["AQL date"], errors="coerce")
     df["Closing Date"] = pd.to_datetime(df["Closing Date"], errors="coerce")
 
@@ -30,7 +58,7 @@ def load_data():
 
 df = load_data()
 
-# ── Sidebar filters ─────────────────────────────────────────────────────────
+# ── Sidebar filters ──────────────────────────────────────────────────────────
 with st.sidebar:
     st.title("🔍 Фільтри")
 
@@ -56,12 +84,12 @@ if len(date_range) == 2:
         (filtered["AQL date"].dt.date <= date_range[1])
     ]
 
-# ── KPI row ─────────────────────────────────────────────────────────────────
+# ── KPI row ──────────────────────────────────────────────────────────────────
 st.title("📊 Deals Analytics Dashboard")
 
 total = len(filtered)
-won = (filtered["Stage"] == "Closed Won").sum()
-lost = (filtered["Stage"] == "Closed Lost").sum()
+won   = (filtered["Stage"] == "Closed Won").sum()
+lost  = (filtered["Stage"] == "Closed Lost").sum()
 win_rate = round(won / (won + lost) * 100, 1) if (won + lost) > 0 else 0
 
 c1, c2, c3, c4 = st.columns(4)
@@ -72,7 +100,7 @@ c4.metric("Win Rate", f"{win_rate}%")
 
 st.divider()
 
-# ── Row 1: Win rate by country + Win rate by CRM ────────────────────────────
+# ── Row 1: Win rate by country + Win rate by CRM ─────────────────────────────
 col1, col2 = st.columns(2)
 
 with col1:
@@ -110,7 +138,7 @@ with col2:
                        margin=dict(l=0, r=20, t=10, b=0), height=380)
     st.plotly_chart(fig2, use_container_width=True)
 
-# ── Row 2: Stage distribution + Deals by Source ─────────────────────────────
+# ── Row 2: Stage distribution + Deals by Source ──────────────────────────────
 col3, col4 = st.columns(2)
 
 with col3:
@@ -118,35 +146,33 @@ with col3:
     stage_counts = filtered["Stage"].value_counts().reset_index()
     stage_counts.columns = ["Stage", "Count"]
     color_map = {
-        "Closed Won": "#2ecc71",
-        "Closed Lost": "#e74c3c",
-        "Negotiations": "#3498db",
-        "Trial": "#f39c12",
-        "Project set up": "#9b59b6",
-        "Payment": "#1abc9c",
+        "Closed Won":    "#2ecc71",
+        "Closed Lost":   "#e74c3c",
+        "Negotiations":  "#3498db",
+        "Trial":         "#f39c12",
+        "Project set up":"#9b59b6",
+        "Payment":       "#1abc9c",
     }
     fig3 = px.pie(stage_counts, values="Count", names="Stage",
-                  color="Stage", color_discrete_map=color_map,
-                  hole=0.4)
+                  color="Stage", color_discrete_map=color_map, hole=0.4)
     fig3.update_traces(textposition="outside", textinfo="percent+label")
     fig3.update_layout(margin=dict(l=0, r=0, t=10, b=0), height=380,
                        showlegend=True, legend=dict(orientation="h", y=-0.15))
     st.plotly_chart(fig3, use_container_width=True)
 
 with col4:
-    st.subheader("📣 Кількість Deals by Source")
+    st.subheader("📣 Deals by Source")
     source_counts = filtered["Source"].value_counts().reset_index()
     source_counts.columns = ["Source", "Count"]
     fig4 = px.bar(source_counts, x="Count", y="Source", orientation="h",
-                  color="Count", color_continuous_scale="blues",
-                  text="Count")
+                  color="Count", color_continuous_scale="blues", text="Count")
     fig4.update_traces(textposition="outside")
     fig4.update_layout(showlegend=False, coloraxis_showscale=False,
                        margin=dict(l=0, r=20, t=10, b=0), height=380,
                        yaxis=dict(categoryorder="total ascending"))
     st.plotly_chart(fig4, use_container_width=True)
 
-# ── Row 3: Win rate by PPC budget ───────────────────────────────────────────
+# ── Row 3: Win rate by PPC budget ────────────────────────────────────────────
 st.subheader("💰 Залежність win rate від PPC budget")
 
 ppc_label_order = ["0.0", "0-500", "500-1000", "1000-2000", "2000-5000", "5000-10000", "20000+"]
@@ -155,9 +181,8 @@ ppc_closed = filtered[filtered["Stage"].isin(["Closed Won", "Closed Lost"])].cop
 by_ppc = (
     ppc_closed.groupby("PPC budget USD")
     .apply(lambda x: pd.Series({
-        "Win Rate %": (x["Stage"] == "Closed Won").sum() / len(x) * 100,
-        "Total deals": len(x),
-        "Won": (x["Stage"] == "Closed Won").sum(),
+        "Win Rate %":   (x["Stage"] == "Closed Won").sum() / len(x) * 100,
+        "Total deals":  len(x),
     }))
     .reset_index()
 )
@@ -171,12 +196,12 @@ fig5.add_trace(go.Bar(
     marker_color="#667eea",
     text=by_ppc["Win Rate %"].apply(lambda x: f"{x:.0f}%"),
     textposition="outside",
-    hovertemplate="<b>%{x}</b><br>Win Rate: %{y:.1f}%<extra></extra>",
     name="Win Rate %",
 ))
 fig5.add_trace(go.Scatter(
     x=by_ppc["PPC budget USD"], y=by_ppc["Win Rate %"],
-    mode="lines+markers", line=dict(color="#f39c12", width=2, dash="dot"),
+    mode="lines+markers",
+    line=dict(color="#f39c12", width=2, dash="dot"),
     marker=dict(size=8, color="#f39c12"),
     name="Тренд",
 ))
@@ -189,5 +214,5 @@ fig5.update_layout(
 )
 st.plotly_chart(fig5, use_container_width=True)
 
-# ── Footer ───────────────────────────────────────────────────────────────────
-st.caption(f"Дані: {total} угод | Фільтр: {len(sel_countries)} країн, {len(sel_crms)} CRM")
+# ── Footer ────────────────────────────────────────────────────────────────────
+st.caption(f"Дані: {total} угод | {len(sel_countries)} країн | {len(sel_crms)} CRM")
