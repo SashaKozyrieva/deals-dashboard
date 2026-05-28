@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from pathlib import Path
-import io, urllib.request
 
 st.set_page_config(page_title="Deals Analytics", layout="wide", page_icon="📊")
 
@@ -13,28 +12,16 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-SHEET_ID = "1JtASSHTRmIyGGU7tWTUGVUmBZwvmtxc6kAKLbHN9gS8"
+SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYJRscGLHS2b2l3S-qdzgY-B-XiZQxzPBHKUEYVuA-lg62asMyGAE-RjpzkU44_iRTwIrtWzYmFZlf/pub?gid=2072143524&single=true&output=csv"
 
 @st.cache_data(ttl=3600)
 def load_data():
-    # Спробуємо завантажити з Google Sheets
-    urls_to_try = [
-        f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0",
-        f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv",
-    ]
     df = None
-    for url in urls_to_try:
-        try:
-            req = urllib.request.Request(
-                url,
-                headers={"User-Agent": "Mozilla/5.0"}
-            )
-            with urllib.request.urlopen(req, timeout=10) as r:
-                data = r.read()
-            df = pd.read_csv(io.BytesIO(data))
-            break
-        except Exception:
-            continue
+    # Завантаження з Google Sheets (публічний CSV)
+    try:
+        df = pd.read_csv(SHEETS_CSV_URL)
+    except Exception as e:
+        st.warning(f"Google Sheets недоступний: {e}. Використовую локальний файл.")
 
     # Fallback: локальний файл data.xlsx
     if df is None:
@@ -42,7 +29,7 @@ def load_data():
         if local.exists():
             df = pd.read_excel(local)
         else:
-            st.error("❌ Не вдалося завантажити дані. Переконайся що таблиця відкрита для перегляду або додай data.xlsx у репо.")
+            st.error("❌ Не вдалося завантажити дані.")
             st.stop()
 
     df.columns = df.columns.str.strip()
